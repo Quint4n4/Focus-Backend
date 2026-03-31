@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l \"C:\\\\Focus-dev\\\\backend_guide \\(1\\).md\")",
+      "Bash(head -150 \"C:\\\\Focus-dev\\\\backend_guide \\(1\\).md\")",
+      "Bash(ls \"C:\\\\Focus-dev\\\\apps\\\\authentication\"\" 2>/dev/null || echo \"directory not found \")",
+      "Bash(powershell -Command \":*)",
+      "Bash(ls \"C:\\\\Focus-dev\\\\nginx\"\" 2>/dev/null && echo \"exists\" || echo \"not found \")"
+    ]
+  }
+}
