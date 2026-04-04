@@ -12,6 +12,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         SUPER_ADMIN = 'super_admin', 'Super Admin'
         ADMIN_AREA  = 'admin_area',  'Admin de Área'
         TRABAJADOR  = 'trabajador',  'Trabajador de Área'
+        PERSONAL    = 'personal',    'Personal'
 
     id = models.UUIDField(
         primary_key=True,
@@ -73,3 +74,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_trabajador(self):
         return self.role == self.Role.TRABAJADOR
+
+    @property
+    def is_personal(self):
+        return self.role == self.Role.PERSONAL
+
+    @property
+    def is_org_user(self):
+        """True si pertenece a una organización (tiene área asignada)."""
+        return self.role in (self.Role.SUPER_ADMIN, self.Role.ADMIN_AREA, self.Role.TRABAJADOR)

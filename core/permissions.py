@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission, IsAuthenticated
 
-VALID_ROLES = {'super_admin', 'admin_area', 'trabajador'}
+VALID_ROLES = {'super_admin', 'admin_area', 'trabajador', 'personal'}
 
 
 class IsSuperAdmin(BasePermission):

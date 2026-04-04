@@ -28,7 +28,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
     """Write serializer for creating/updating projects."""
-    area = serializers.PrimaryKeyRelatedField(queryset=Area.objects.all())
+    area = serializers.PrimaryKeyRelatedField(
+        queryset=Area.objects.all(),
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Project

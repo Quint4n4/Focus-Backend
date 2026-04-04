@@ -26,6 +26,7 @@ class Activity(models.Model):
                                     null=True, blank=True, related_name='activities_assigned_by')
 
     area        = models.ForeignKey('areas.Area', on_delete=models.CASCADE,
+                                    null=True, blank=True,
                                     related_name='activities')
     project     = models.ForeignKey('projects.Project', on_delete=models.SET_NULL,
                                     null=True, blank=True, related_name='activities')

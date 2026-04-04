@@ -42,7 +42,8 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     """Serializer de solo lectura para los datos del usuario autenticado."""
 
-    area_id = serializers.PrimaryKeyRelatedField(source='area', read_only=True)
+    area_id   = serializers.PrimaryKeyRelatedField(source='area', read_only=True)
+    area_name = serializers.SerializerMethodField()
 
     class Meta:
         model  = User
@@ -53,11 +54,15 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name',
             'role',
             'area_id',
+            'area_name',
             'biometrics_enabled',
             'onboarding_completed',
             'created_at',
         ]
         read_only_fields = fields
+
+    def get_area_name(self, obj):
+        return obj.area.name if obj.area else None
 
 
 class BiometricEnableSerializer(serializers.Serializer):

@@ -16,6 +16,7 @@ from .serializers import (
     InvitationCreateSerializer,
     UserDetailSerializer,
     UserListSerializer,
+    VerifyInviteSerializer,
 )
 
 User = get_user_model()
@@ -99,17 +100,47 @@ class InviteView(APIView):
         serializer = InvitationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # admin_area can only invite to their own area
+        role = serializer.validated_data.get('role')
+        area = serializer.validated_data.get('area')
+
         if request.user.role == 'admin_area':
-            area = serializer.validated_data.get('area')
+            # AA solo puede invitar trabajadores a su propia área
+            if role != 'trabajador':
+                return Response(
+                    {'role': 'Solo puedes invitar trabajadores a tu área.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             if area and area.id != request.user.area_id:
                 return Response(
                     {'area': 'Solo puedes crear invitaciones para tu propia área.'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+        # Solo SA puede invitar a otro SA
+        if role == 'super_admin' and request.user.role != 'super_admin':
+            return Response(
+                {'role': 'Solo un Super Admin puede invitar a otro Super Admin.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         result = serializer.save(created_by=request.user)
         return Response(result, status=status.HTTP_201_CREATED)
+
+
+class VerifyInviteView(APIView):
+    """POST /api/users/invite/verify/ — valida un código sin consumirlo."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = VerifyInviteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invitation = serializer.validated_data['_invitation']
+        return Response({
+            'role':       invitation.role,
+            'area_name':  invitation.area.name if invitation.area else None,
+            'expires_at': invitation.expires_at,
+        })
 
 
 class AcceptInviteView(APIView):
@@ -128,6 +159,7 @@ class AcceptInviteView(APIView):
                 'first_name': user.first_name,
                 'last_name':  user.last_name,
                 'role':       user.role,
+                'area_id':    str(user.area_id) if user.area_id else None,
             },
             status=status.HTTP_201_CREATED,
         )

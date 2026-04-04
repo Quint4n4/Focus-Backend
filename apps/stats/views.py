@@ -1,7 +1,8 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q
+from django.db.models import Avg, Count, FloatField, Q
+from django.db.models.functions import Cast
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
@@ -10,7 +11,7 @@ from rest_framework.views import APIView
 
 from apps.activities.models import Activity
 from apps.areas.models import Area
-from core.permissions import IsAdminAreaOrAbove, IsWorkerOrAbove
+from core.permissions import IsAdminAreaOrAbove, IsSuperAdmin, IsWorkerOrAbove
 
 User = get_user_model()
 
@@ -204,4 +205,102 @@ class DrilldownView(APIView):
             'by_status':  by_status,
             'by_project': by_project,
             'by_user':    by_user,
+        })
+
+
+class GlobalStatsView(APIView):
+    """
+    GET /api/stats/global/
+    Solo Super Admin. Devuelve un resumen por cada área con su tasa de completado
+    y lista de AA — equivale al bloque "Rendimiento por equipos" que ve el SA en Flutter.
+    """
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        areas = Area.objects.all()
+        result = []
+        for area in areas:
+            qs = Activity.objects.filter(area=area)
+            total     = qs.count()
+            completed = qs.filter(status='completed').count()
+            rate      = round(completed / total * 100, 1) if total > 0 else 0.0
+
+            # Admin(s) del área
+            admins = User.objects.filter(area=area, role='admin_area').values(
+                'id', 'email', 'first_name', 'last_name'
+            )
+            admin_list = [
+                {
+                    'id':         str(a['id']),
+                    'email':      a['email'],
+                    'full_name':  f"{a['first_name']} {a['last_name']}".strip(),
+                }
+                for a in admins
+            ]
+
+            result.append({
+                'area_id':         str(area.id),
+                'area_name':       area.name,
+                'total_activities': total,
+                'completed':       completed,
+                'completion_rate': rate,
+                'admins':          admin_list,
+            })
+
+        # Ordenar por completion_rate descendente
+        result.sort(key=lambda x: x['completion_rate'], reverse=True)
+        return Response(result)
+
+
+class WorkerStatsView(APIView):
+    """
+    GET /api/stats/workers/
+    Admin de Área o Superior. Devuelve estadísticas por trabajador del área.
+    AA ve solo su área; SA puede filtrar por ?area=<uuid>.
+    """
+    permission_classes = [IsAdminAreaOrAbove]
+
+    def get(self, request):
+        user = request.user
+
+        if user.role == 'admin_area':
+            area = user.area
+        else:
+            area_pk = request.query_params.get('area')
+            if not area_pk:
+                return Response(
+                    {'detail': 'Parámetro "area" requerido para Super Admin.'},
+                    status=400,
+                )
+            area = get_object_or_404(Area, pk=area_pk)
+
+        workers_qs = User.objects.filter(area=area, role='trabajador').annotate(
+            total_owned=Count('owned_activities', filter=Q(owned_activities__area=area)),
+            total_assigned=Count('assigned_activities', filter=Q(assigned_activities__area=area)),
+            total_completed=Count(
+                'owned_activities',
+                filter=Q(owned_activities__area=area, owned_activities__status='completed'),
+            ),
+        )
+
+        workers = [
+            {
+                'user_id':        str(w.id),
+                'email':          w.email,
+                'full_name':      w.full_name,
+                'total_owned':    w.total_owned,
+                'total_assigned': w.total_assigned,
+                'completed':      w.total_completed,
+                'completion_rate': (
+                    round(w.total_completed / w.total_owned * 100, 1)
+                    if w.total_owned > 0 else 0.0
+                ),
+            }
+            for w in workers_qs
+        ]
+
+        return Response({
+            'area_id':   str(area.id),
+            'area_name': area.name,
+            'workers':   workers,
         })

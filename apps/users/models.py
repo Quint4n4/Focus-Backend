@@ -8,14 +8,18 @@ from django.utils import timezone
 
 class Invitation(models.Model):
     class Role(models.TextChoices):
-        ADMIN_AREA = 'admin_area', 'Admin de Área'
-        TRABAJADOR = 'trabajador', 'Trabajador de Área'
+        SUPER_ADMIN = 'super_admin', 'Super Admin'
+        ADMIN_AREA  = 'admin_area',  'Admin de Área'
+        TRABAJADOR  = 'trabajador',  'Trabajador de Área'
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     token_hash = models.CharField(max_length=64, unique=True)  # SHA-256 del token real
+    code       = models.CharField(max_length=16, unique=True, null=True, blank=True)  # código corto legible
     area       = models.ForeignKey(
         'areas.Area',
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name='invitations',
     )
     role = models.CharField(
@@ -48,6 +52,16 @@ class Invitation(models.Model):
     @classmethod
     def hash_token(cls, raw_token: str) -> str:
         return hashlib.sha256(raw_token.encode()).hexdigest()
+
+    @classmethod
+    def generate_code(cls) -> str:
+        """Genera un código corto único de 8 chars (ej. XK92BLP3)."""
+        import string
+        alphabet = string.ascii_uppercase + string.digits
+        while True:
+            code = ''.join(secrets.choice(alphabet) for _ in range(8))
+            if not cls.objects.filter(code=code).exists():
+                return code
 
     @property
     def is_valid(self):

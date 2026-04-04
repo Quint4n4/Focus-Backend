@@ -33,7 +33,11 @@ class ActivitySerializer(serializers.ModelSerializer):
         queryset=User.objects.all(),
     )
     assigned_by = _UserMiniSerializer(read_only=True)
-    area = serializers.PrimaryKeyRelatedField(queryset=Area.objects.all())
+    area = serializers.PrimaryKeyRelatedField(
+        queryset=Area.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     project = (
         serializers.PrimaryKeyRelatedField(
             allow_null=True,
@@ -59,17 +63,16 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 
 class ActivityListSerializer(serializers.ModelSerializer):
-    owner_id = serializers.UUIDField(source='owner_id', read_only=True)
-    assigned_to_id = serializers.UUIDField(
-        source='assigned_to_id', read_only=True, allow_null=True
-    )
-    area_id = serializers.UUIDField(source='area_id', read_only=True)
+    owner_id = serializers.UUIDField(read_only=True)
+    assigned_to_id = serializers.UUIDField(read_only=True, allow_null=True)
+    area_id = serializers.UUIDField(read_only=True, allow_null=True)
+    project_id = serializers.UUIDField(read_only=True, allow_null=True)
 
     class Meta:
         model = Activity
         fields = [
             'id', 'title', 'status',
-            'owner_id', 'assigned_to_id', 'area_id',
+            'owner_id', 'assigned_to_id', 'area_id', 'project_id',
             'target_date', 'completed_at', 'created_at',
         ]
 

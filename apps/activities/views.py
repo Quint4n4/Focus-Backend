@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -48,15 +49,31 @@ class ActivityListCreateView(generics.ListCreateAPIView):
         return ActivitySerializer
 
     def get_queryset(self):
-        user = self.request.user
+        user  = self.request.user
+        scope = self.request.query_params.get('scope')  # 'personal' | 'team' | None
+
         if user.role == 'super_admin':
-            return Activity.objects.all()
+            qs = Activity.objects.all()
+            if scope == 'personal':
+                qs = qs.filter(owner=user)
+            return qs
+
         if user.role == 'admin_area':
+            if scope == 'personal':
+                return Activity.objects.filter(owner=user)
+            # scope='team' o sin scope → todo el área
             return Activity.objects.filter(area=user.area)
-        # trabajador
-        return Activity.objects.filter(
-            owner=user
-        ) | Activity.objects.filter(assigned_to=user)
+
+        # trabajador: propio + asignadas
+        qs = Activity.objects.filter(owner=user) | Activity.objects.filter(assigned_to=user)
+        if scope == 'team':
+            # Solo actividades del área (excluye las puramente personales)
+            qs = Activity.objects.filter(area=user.area).filter(
+                models.Q(owner=user) | models.Q(assigned_to=user)
+            )
+        elif scope == 'personal':
+            qs = Activity.objects.filter(owner=user, area__isnull=True)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
