@@ -1,8 +1,11 @@
 #!/bin/sh
-set -e
 
 echo "==> Aplicando migraciones..."
-python manage.py migrate --no-input
+if python manage.py migrate --no-input; then
+    echo "==> Migraciones aplicadas correctamente."
+else
+    echo "!!! WARN: migrate falló — arrancando gunicorn de todas formas para que /health/ sea accesible."
+fi
 
 echo "==> Creando superadmin si no existe..."
 python manage.py shell -c "
@@ -18,7 +21,7 @@ if not User.objects.filter(email='admin@focus.com').exists():
     print('Superadmin creado.')
 else:
     print('Superadmin ya existe.')
-"
+" || echo "!!! WARN: creación de superadmin falló (DB no disponible)."
 
 echo "==> Iniciando gunicorn..."
 exec gunicorn config.wsgi:application \
