@@ -12,7 +12,7 @@ DATABASES = {
     'default': dj_database_url.parse(
         config('DATABASE_URL'),
         conn_max_age=600,
-        ssl_require=True,
+        ssl_require=config('DB_SSL_REQUIRE', default=False, cast=bool),
     )
 }
 
@@ -38,9 +38,9 @@ CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
 
-# ── Logging — solo archivo en producción (sin consola) ──
-LOGGING['loggers']['django']['handlers'] = ['django_file']  # noqa: F405
-LOGGING['loggers']['productivity']['handlers'] = ['django_file']  # noqa: F405
+# ── Logging — consola en producción (Sevalla captura stdout) ──
+LOGGING['loggers']['django']['handlers'] = ['console']  # noqa: F405
+LOGGING['loggers']['productivity']['handlers'] = ['console']  # noqa: F405
 
 # ── Content Security Policy (django-csp) ──
 MIDDLEWARE = [  # noqa: F405
