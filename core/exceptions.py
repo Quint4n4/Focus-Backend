@@ -1,6 +1,10 @@
+import logging
+
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
+
+logger = logging.getLogger('django.request')
 
 
 def custom_exception_handler(exc, context):
@@ -27,5 +31,15 @@ def custom_exception_handler(exc, context):
             'status_code': response.status_code,
             'detail': response.data,
         }
+        return response
 
-    return response
+    # Capturar errores de DB y cualquier excepción no manejada — devolver JSON
+    logger.error('Unhandled exception in view', exc_info=exc)
+    return Response(
+        {
+            'error': True,
+            'status_code': 500,
+            'detail': str(exc),
+        },
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )

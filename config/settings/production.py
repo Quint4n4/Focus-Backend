@@ -8,13 +8,14 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 # ── Base de datos — PostgreSQL ──
 import dj_database_url  # noqa: E402
 
-_db = dj_database_url.parse(config('DATABASE_URL'), conn_max_age=600)
+_db = dj_database_url.parse(config('DATABASE_URL'), conn_max_age=0)
 
 # DB_SSLMODE acepta: require | disable | prefer | verify-full
-# En Sevalla (Kubernetes interno) probar primero 'require', si falla probar 'disable'
-_sslmode = config('DB_SSLMODE', default='require')
+_sslmode = config('DB_SSLMODE', default='disable')
 _db.setdefault('OPTIONS', {})
 _db['OPTIONS']['sslmode'] = _sslmode
+# connect_timeout: si la DB no responde en 10s, falla rápido (libera el worker)
+_db['OPTIONS']['connect_timeout'] = 10
 
 DATABASES = {'default': _db}
 

@@ -44,11 +44,13 @@ class ProjectListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        # select_related solo created_by — el serializer usa area_id directo (no necesita el objeto Area)
+        qs = Project.objects.select_related('created_by')
         if user.role == 'super_admin':
-            return Project.objects.all()
-        # Proyectos del área del usuario + proyectos personales propios (sin área)
-        return Project.objects.filter(
-            Q(area=user.area) | Q(area__isnull=True, created_by=user)
+            return qs.all()
+        # Usar area_id en lugar de area para evitar el SELECT extra a areas_area
+        return qs.filter(
+            Q(area_id=user.area_id) | Q(area_id__isnull=True, created_by=user)
         )
 
     def perform_create(self, serializer):

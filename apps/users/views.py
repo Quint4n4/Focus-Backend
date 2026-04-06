@@ -23,17 +23,27 @@ User = get_user_model()
 
 
 class UserListView(generics.ListAPIView):
-    """GET /api/users/ — list users. Requires admin_area or above."""
+    """GET /api/users/ — list users. Requires admin_area or above.
+    Soporta ?role=<role> para filtrar por rol.
+    """
 
     serializer_class   = UserListSerializer
     permission_classes = [IsAdminAreaOrAbove]
 
     def get_queryset(self):
         user = self.request.user
+        role_filter = self.request.query_params.get('role')
+
         if user.role == 'super_admin':
-            return User.objects.all()
-        # admin_area: only members of their own area
-        return User.objects.filter(area=user.area)
+            qs = User.objects.all()
+        else:
+            # admin_area: usar area_id directo para evitar SELECT extra a areas_area
+            qs = User.objects.filter(area_id=user.area_id)
+
+        if role_filter:
+            qs = qs.filter(role=role_filter)
+
+        return qs
 
 
 class UserDetailView(generics.RetrieveUpdateAPIView):
@@ -128,12 +138,15 @@ class InviteView(APIView):
 
 
 class VerifyInviteView(APIView):
-    """POST /api/users/invite/verify/ — valida un código sin consumirlo."""
+    """
+    GET  /api/users/invite/verify/?code=XXXXXXXX — valida sin consumir
+    POST /api/users/invite/verify/               — mismo, con body {"code": "..."}
+    """
 
     permission_classes = [AllowAny]
 
-    def post(self, request):
-        serializer = VerifyInviteSerializer(data=request.data)
+    def _verify(self, data):
+        serializer = VerifyInviteSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         invitation = serializer.validated_data['_invitation']
         return Response({
@@ -141,6 +154,12 @@ class VerifyInviteView(APIView):
             'area_name':  invitation.area.name if invitation.area else None,
             'expires_at': invitation.expires_at,
         })
+
+    def get(self, request):
+        return self._verify({'code': request.query_params.get('code', '')})
+
+    def post(self, request):
+        return self._verify(request.data)
 
 
 class AcceptInviteView(APIView):

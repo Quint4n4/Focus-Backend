@@ -42,37 +42,28 @@ def health_check(request):
         info['tcp_status'] = 'error'
         info['tcp_error'] = str(e)
 
-    # Test 2: raw psycopg2 — conectar a 'postgres' (siempre existe)
+    # Test 2: PostgreSQL connection + active queries
     try:
-        import psycopg2
-        conn = psycopg2.connect(
-            host=host, port=port,
-            user=db_settings.get('USER'),
-            password=db_settings.get('PASSWORD'),
-            dbname='postgres',
-            sslmode='disable',
-            connect_timeout=5,
-        )
-        conn.close()
-        info['raw_postgres_db'] = 'ok'
-    except Exception as e:
-        info['raw_postgres_db'] = 'error'
-        info['raw_postgres_db_error'] = str(e)
-
-    # Test 3: raw psycopg2 — conectar a la DB real
-    try:
-        import psycopg2
-        conn = psycopg2.connect(
-            host=host, port=port,
-            user=db_settings.get('USER'),
-            password=db_settings.get('PASSWORD'),
-            dbname=db_settings.get('NAME'),
-            sslmode='disable',
-            connect_timeout=5,
-        )
-        conn.close()
+        from django.db import connection
+        connection.close()
+        connection.ensure_connection()
         info['db_status'] = 'ok'
         info['status'] = 'ok'
+
+        # Queries activas (útil para detectar deadlocks/queries lentas)
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT pid, state, wait_event_type, wait_event,
+                       EXTRACT(EPOCH FROM (now() - query_start))::int AS duration_s,
+                       LEFT(query, 120) AS query
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND state != 'idle'
+                ORDER BY duration_s DESC NULLS LAST
+                LIMIT 10
+            """)
+            cols = [c.name for c in cursor.description]
+            info['active_queries'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
     except Exception as e:
         info['db_status'] = 'error'
         info['db_error'] = str(e)
