@@ -236,6 +236,11 @@ class AttachmentListCreateView(APIView):
     def get(self, request, pk):
         activity = self._get_activity(pk)
         attachments = activity.attachments.all()
+
+        # TA solo ve sus propios adjuntos
+        if request.user.role not in ('super_admin', 'admin_area'):
+            attachments = attachments.filter(uploaded_by=request.user)
+
         serializer = ActivityAttachmentSerializer(
             attachments, many=True, context={'request': request}
         )
@@ -253,6 +258,41 @@ class AttachmentListCreateView(APIView):
         )
         serializer = ActivityAttachmentSerializer(attachment, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ServeAttachmentFileView(APIView):
+    """
+    GET /api/activities/<pk>/attachments/<attachment_pk>/file/
+    Sirve el archivo con control de acceso:
+      SA  → todos
+      AA  → solo adjuntos de actividades de su área
+      TA  → solo adjuntos que él mismo subió
+    """
+    permission_classes = [IsWorkerOrAbove]
+
+    def get(self, request, pk, attachment_pk):
+        import os
+        from django.http import FileResponse
+        from rest_framework.exceptions import NotFound, PermissionDenied
+
+        activity   = get_object_or_404(Activity, pk=pk)
+        attachment = get_object_or_404(ActivityAttachment, pk=attachment_pk, activity=activity)
+        user       = request.user
+
+        if user.role == 'super_admin':
+            pass
+        elif user.role == 'admin_area':
+            if activity.area_id != user.area_id:
+                raise NotFound()
+        else:
+            if attachment.uploaded_by_id != user.pk:
+                raise PermissionDenied()
+
+        response = FileResponse(attachment.file.open('rb'))
+        response['Content-Disposition'] = (
+            f'inline; filename="{os.path.basename(attachment.file.name)}"'
+        )
+        return response
 
 
 class AttachmentDeleteView(APIView):

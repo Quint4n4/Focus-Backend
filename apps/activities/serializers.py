@@ -107,12 +107,17 @@ class ActivityLogSerializer(serializers.ModelSerializer):
 
 
 class ActivityAttachmentSerializer(serializers.ModelSerializer):
-    file = serializers.FileField(use_url=True)
+    file = serializers.SerializerMethodField()
     uploaded_by = _UserTinySerializer(read_only=True)
 
     class Meta:
         model = ActivityAttachment
         fields = ['id', 'file', 'uploaded_by', 'created_at']
+
+    def get_file(self, obj):
+        request = self.context.get('request')
+        url = f'/api/activities/{obj.activity_id}/attachments/{obj.id}/file/'
+        return request.build_absolute_uri(url) if request else url
 
 
 class AttachmentUploadSerializer(serializers.Serializer):
