@@ -42,17 +42,40 @@ def health_check(request):
         info['tcp_status'] = 'error'
         info['tcp_error'] = str(e)
 
-    # Test 2: PostgreSQL connection
+    # Test 2: raw psycopg2 — conectar a 'postgres' (siempre existe)
     try:
-        from django.db import connection
-        connection.close()  # force a fresh connection
-        connection.ensure_connection()
+        import psycopg2
+        conn = psycopg2.connect(
+            host=host, port=port,
+            user=db_settings.get('USER'),
+            password=db_settings.get('PASSWORD'),
+            dbname='postgres',
+            sslmode='disable',
+            connect_timeout=5,
+        )
+        conn.close()
+        info['raw_postgres_db'] = 'ok'
+    except Exception as e:
+        info['raw_postgres_db'] = 'error'
+        info['raw_postgres_db_error'] = str(e)
+
+    # Test 3: raw psycopg2 — conectar a la DB real
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=host, port=port,
+            user=db_settings.get('USER'),
+            password=db_settings.get('PASSWORD'),
+            dbname=db_settings.get('NAME'),
+            sslmode='disable',
+            connect_timeout=5,
+        )
+        conn.close()
         info['db_status'] = 'ok'
         info['status'] = 'ok'
     except Exception as e:
         info['db_status'] = 'error'
         info['db_error'] = str(e)
-        info['db_traceback'] = traceback.format_exc()
         info['status'] = 'degraded'
     return JsonResponse(info)
 
