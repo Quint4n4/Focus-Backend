@@ -11,7 +11,7 @@ User = get_user_model()
 class ProjectSerializer(serializers.ModelSerializer):
     """Full read serializer."""
     created_by = serializers.SerializerMethodField()
-    area_id = serializers.UUIDField(source='area_id', read_only=True)
+    area_id = serializers.UUIDField(read_only=True, allow_null=True)
 
     class Meta:
         model = Project

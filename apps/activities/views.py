@@ -62,13 +62,13 @@ class ActivityListCreateView(generics.ListCreateAPIView):
             if scope == 'personal':
                 return Activity.objects.filter(owner=user)
             # scope='team' o sin scope → todo el área
-            return Activity.objects.filter(area=user.area)
+            return Activity.objects.filter(area_id=user.area_id)
 
         # trabajador: propio + asignadas
         qs = Activity.objects.filter(owner=user) | Activity.objects.filter(assigned_to=user)
         if scope == 'team':
             # Solo actividades del área (excluye las puramente personales)
-            qs = Activity.objects.filter(area=user.area).filter(
+            qs = Activity.objects.filter(area_id=user.area_id).filter(
                 models.Q(owner=user) | models.Q(assigned_to=user)
             )
         elif scope == 'personal':

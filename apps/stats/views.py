@@ -129,7 +129,7 @@ class DrilldownView(APIView):
 
         # Area filter — admin_area is always forced to their own area
         if user.role == 'admin_area':
-            qs = qs.filter(area=user.area)
+            qs = qs.filter(area_id=user.area_id)
             filters_used['area'] = str(user.area_id)
         elif params.get('area'):
             qs = qs.filter(area_id=params['area'])
@@ -264,7 +264,7 @@ class WorkerStatsView(APIView):
         user = request.user
 
         if user.role == 'admin_area':
-            area = user.area
+            area = get_object_or_404(Area, pk=user.area_id)
         else:
             area_pk = request.query_params.get('area')
             if not area_pk:
