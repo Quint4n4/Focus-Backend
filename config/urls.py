@@ -19,23 +19,40 @@ from django.http import JsonResponse
 
 
 def health_check(request):
-    import django.db
+    import socket
+    import traceback
     db_settings = settings.DATABASES.get('default', {})
+    host = db_settings.get('HOST', '')
+    port = int(db_settings.get('PORT') or 5432)
     info = {
-        'host': db_settings.get('HOST', 'N/A'),
-        'port': db_settings.get('PORT', 'N/A'),
+        'host': host,
+        'port': port,
         'name': db_settings.get('NAME', 'N/A'),
         'user': db_settings.get('USER', 'N/A'),
         'engine': db_settings.get('ENGINE', 'N/A'),
+        'options': db_settings.get('OPTIONS', {}),
     }
+
+    # Test 1: TCP reachability
+    try:
+        sock = socket.create_connection((host, port), timeout=5)
+        sock.close()
+        info['tcp_status'] = 'ok'
+    except Exception as e:
+        info['tcp_status'] = 'error'
+        info['tcp_error'] = str(e)
+
+    # Test 2: PostgreSQL connection
     try:
         from django.db import connection
+        connection.close()  # force a fresh connection
         connection.ensure_connection()
         info['db_status'] = 'ok'
         info['status'] = 'ok'
     except Exception as e:
         info['db_status'] = 'error'
         info['db_error'] = str(e)
+        info['db_traceback'] = traceback.format_exc()
         info['status'] = 'degraded'
     return JsonResponse(info)
 
