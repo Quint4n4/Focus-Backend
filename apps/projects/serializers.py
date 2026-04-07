@@ -10,20 +10,44 @@ User = get_user_model()
 
 class ProjectSerializer(serializers.ModelSerializer):
     """Full read serializer."""
-    created_by = serializers.SerializerMethodField()
-    area_id = serializers.UUIDField(read_only=True, allow_null=True)
+    created_by     = serializers.SerializerMethodField()
+    area_id        = serializers.UUIDField(read_only=True, allow_null=True)
+    area_name      = serializers.SerializerMethodField()
+    area_admin_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ['id', 'name', 'description', 'area_id', 'created_by',
-                  'status', 'target_date', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_by', 'area_id', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'description',
+            'area_id', 'area_name', 'area_admin_name',
+            'created_by', 'status', 'target_date',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'created_by', 'area_id', 'area_name', 'area_admin_name',
+            'created_at', 'updated_at',
+        ]
 
     def get_created_by(self, obj):
         user = obj.created_by
         if user is None:
             return None
         return {'id': str(user.id), 'email': user.email}
+
+    def get_area_name(self, obj):
+        # area está en select_related — sin query extra
+        return obj.area.name if obj.area_id and obj.area else None
+
+    def get_area_admin_name(self, obj):
+        if not obj.area_id:
+            return None
+        # Usa area_id directo (sin cargar area FK de nuevo)
+        admin = User.objects.filter(
+            area_id=obj.area_id, role='admin_area'
+        ).values('first_name', 'last_name').first()
+        if admin:
+            return f"{admin['first_name']} {admin['last_name']}".strip() or None
+        return None
 
 
 class ProjectCreateSerializer(serializers.ModelSerializer):
@@ -37,6 +61,14 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ['name', 'description', 'area', 'status', 'target_date']
+
+    def to_internal_value(self, data):
+        # El cliente puede enviar 'area_id' (igual que el campo de lectura).
+        # Normalizar a 'area' para que PrimaryKeyRelatedField lo procese.
+        if 'area_id' in data and 'area' not in data:
+            data = data.copy()
+            data['area'] = data['area_id']
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         request = self.context.get('request')

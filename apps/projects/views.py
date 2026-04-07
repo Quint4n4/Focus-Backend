@@ -15,7 +15,7 @@ User = get_user_model()
 
 def _get_project_for_user(pk, user):
     """Return Project if user has access, raise NotFound otherwise."""
-    project = get_object_or_404(Project, pk=pk)
+    project = get_object_or_404(Project.objects.select_related('created_by', 'area'), pk=pk)
     if user.role == 'super_admin':
         return project
     # Proyecto personal (sin área) creado por este usuario
@@ -44,11 +44,9 @@ class ProjectListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        # select_related solo created_by — el serializer usa area_id directo (no necesita el objeto Area)
-        qs = Project.objects.select_related('created_by')
+        qs = Project.objects.select_related('created_by', 'area')
         if user.role == 'super_admin':
             return qs.all()
-        # Usar area_id en lugar de area para evitar el SELECT extra a areas_area
         return qs.filter(
             Q(area_id=user.area_id) | Q(area_id__isnull=True, created_by=user)
         )
@@ -125,11 +123,22 @@ class ProjectActivitiesView(APIView):
     permission_classes = [IsWorkerOrAbove]
 
     def get(self, request, pk):
+        from django.db.models import Q as DQ
+        from apps.activities.models import Activity
         from apps.activities.serializers import ActivityListSerializer
         from rest_framework.pagination import PageNumberPagination
 
         project = _get_project_for_user(pk, request.user)
+        user = request.user
+
         qs = project.activities.order_by('-created_at')
+
+        # SA y AA ven todas las actividades del proyecto.
+        # _get_project_for_user ya garantizó que el AA pertenece al área del proyecto,
+        # así que no filtramos por area_id aquí (actividades pueden tenerlo null).
+        if user.role not in ('super_admin', 'admin_area'):
+            # trabajador/personal: solo las propias o asignadas
+            qs = qs.filter(DQ(owner=user) | DQ(assigned_to=user))
 
         paginator = PageNumberPagination()
         paginator.page_size = 20

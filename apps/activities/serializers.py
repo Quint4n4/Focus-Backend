@@ -48,6 +48,17 @@ class ActivitySerializer(serializers.ModelSerializer):
         else serializers.UUIDField(allow_null=True, required=False)
     )
 
+    def to_internal_value(self, data):
+        # Normalizar area_id → area y project_id → project por si el cliente
+        # envía los nombres con sufijo _id (igual a los campos de lectura).
+        if 'area_id' in data or 'project_id' in data:
+            data = data.copy()  # dict.copy() o QueryDict.copy() — ambos OK
+            if 'area_id' in data and 'area' not in data:
+                data['area'] = data['area_id']
+            if 'project_id' in data and 'project' not in data:
+                data['project'] = data['project_id']
+        return super().to_internal_value(data)
+
     class Meta:
         model = Activity
         fields = [

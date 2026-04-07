@@ -61,8 +61,13 @@ class ActivityListCreateView(generics.ListCreateAPIView):
         if user.role == 'admin_area':
             if scope == 'personal':
                 return Activity.objects.filter(owner=user)
-            # scope='team' o sin scope → todo el área
-            return Activity.objects.filter(area_id=user.area_id)
+            # scope='team' o sin scope → todo el área.
+            # Incluimos actividades cuyo project.area_id coincide para cubrir
+            # el caso donde area_id quedó null pero el proyecto sí pertenece al área.
+            return Activity.objects.filter(
+                models.Q(area_id=user.area_id) |
+                models.Q(area_id__isnull=True, project__area_id=user.area_id)
+            )
 
         # trabajador: propio + asignadas
         qs = Activity.objects.filter(owner=user) | Activity.objects.filter(assigned_to=user)
@@ -76,7 +81,14 @@ class ActivityListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        kwargs = {'owner': self.request.user}
+        # Si la actividad se crea dentro de un proyecto que tiene área,
+        # y el cliente no mandó área explícita, heredarla del proyecto.
+        project = serializer.validated_data.get('project')
+        area    = serializer.validated_data.get('area')
+        if project and not area and project.area_id:
+            kwargs['area_id'] = project.area_id
+        serializer.save(**kwargs)
 
 
 class ActivityDetailView(APIView):

@@ -64,6 +64,29 @@ def health_check(request):
             """)
             cols = [c.name for c in cursor.description]
             info['active_queries'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        # Diagnóstico de proyectos: últimos 5 para verificar área persistida
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id::text, name, area_id::text, created_at
+                FROM projects_project
+                ORDER BY created_at DESC
+                LIMIT 5
+            """)
+            cols = [c.name for c in cursor.description]
+            info['recent_projects'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+        # Diagnóstico de actividades: últimas 5 para verificar area_id
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id::text, title, area_id::text, project_id::text, created_at
+                FROM activities_activity
+                ORDER BY created_at DESC
+                LIMIT 5
+            """)
+            cols = [c.name for c in cursor.description]
+            info['recent_activities'] = [dict(zip(cols, row)) for row in cursor.fetchall()]
+
     except Exception as e:
         info['db_status'] = 'error'
         info['db_error'] = str(e)
