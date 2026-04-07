@@ -10,21 +10,22 @@ User = get_user_model()
 
 class ProjectSerializer(serializers.ModelSerializer):
     """Full read serializer."""
-    created_by     = serializers.SerializerMethodField()
-    area_id        = serializers.UUIDField(read_only=True, allow_null=True)
-    area_name      = serializers.SerializerMethodField()
+    created_by      = serializers.SerializerMethodField()
+    # 'area' como clave JSON (Flutter lo lee como 'area', no 'area_id')
+    area            = serializers.UUIDField(source='area_id', read_only=True, allow_null=True)
+    area_name       = serializers.SerializerMethodField()
     area_admin_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = [
             'id', 'name', 'description',
-            'area_id', 'area_name', 'area_admin_name',
+            'area', 'area_name', 'area_admin_name',
             'created_by', 'status', 'target_date',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'created_by', 'area_id', 'area_name', 'area_admin_name',
+            'id', 'created_by', 'area', 'area_name', 'area_admin_name',
             'created_at', 'updated_at',
         ]
 
