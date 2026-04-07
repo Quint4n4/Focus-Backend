@@ -124,7 +124,7 @@ class ActivityDetailView(APIView):
 class MoveActivityView(APIView):
     permission_classes = [IsWorkerOrAbove]
 
-    def patch(self, request, pk):
+    def post(self, request, pk):
         try:
             activity = _get_activity_for_user(pk, request.user)
         except Exception:
@@ -159,7 +159,7 @@ class MoveActivityView(APIView):
 class AssignActivityView(APIView):
     permission_classes = [IsAdminAreaOrAbove]
 
-    def patch(self, request, pk):
+    def post(self, request, pk):
         activity = get_object_or_404(Activity, pk=pk)
         user = request.user
 
