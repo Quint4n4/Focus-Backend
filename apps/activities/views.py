@@ -22,6 +22,30 @@ from .serializers import (
 User = get_user_model()
 
 
+def _can_aa_access_activity(activity, user):
+    """
+    Reglas de acceso para admin_area — debe mantenerse en sync con
+    el queryset de ActivityListCreateView (scope team).
+
+    Un AA puede ver una actividad si:
+      1. La actividad pertenece a su área (area_id coincide).
+      2. La actividad no tiene área pero pertenece a un proyecto del área del AA
+         (cubre actividades históricas con area_id=null creadas en proyectos del área).
+      3. El AA la creó (owner) — garantiza que el creador siempre puede ver
+         lo que acaba de crear, incluso si el proyecto aún no tiene área en DB.
+    """
+    if activity.area_id and activity.area_id == user.area_id:
+        return True
+    if activity.owner_id == user.pk:
+        return True
+    if activity.area_id is None and activity.project_id:
+        from apps.projects.models import Project
+        return Project.objects.filter(
+            pk=activity.project_id, area_id=user.area_id
+        ).exists()
+    return False
+
+
 def _get_activity_for_user(pk, user):
     """
     Return the Activity with the given pk if the user has read access,
@@ -31,10 +55,10 @@ def _get_activity_for_user(pk, user):
     if user.role == 'super_admin':
         return activity
     if user.role == 'admin_area':
-        if activity.area_id == user.area_id:
+        if _can_aa_access_activity(activity, user):
             return activity
         raise Activity.DoesNotExist
-    # trabajador
+    # trabajador/personal: propio + asignadas
     if activity.owner_id == user.pk or activity.assigned_to_id == user.pk:
         return activity
     raise Activity.DoesNotExist
@@ -62,12 +86,15 @@ class ActivityListCreateView(generics.ListCreateAPIView):
             if scope == 'personal':
                 return Activity.objects.filter(owner=user)
             # scope='team' o sin scope → todo el área.
-            # Incluimos actividades cuyo project.area_id coincide para cubrir
-            # el caso donde area_id quedó null pero el proyecto sí pertenece al área.
+            # Reglas en sync con _can_aa_access_activity:
+            #   1. area_id del AA
+            #   2. area_id null pero project del área del AA (datos históricos)
+            #   3. owner=user — creador siempre ve sus propias actividades
             return Activity.objects.filter(
                 models.Q(area_id=user.area_id) |
-                models.Q(area_id__isnull=True, project__area_id=user.area_id)
-            )
+                models.Q(area_id__isnull=True, project__area_id=user.area_id) |
+                models.Q(owner=user)
+            ).distinct()
 
         # trabajador: propio + asignadas
         qs = Activity.objects.filter(owner=user) | Activity.objects.filter(assigned_to=user)
