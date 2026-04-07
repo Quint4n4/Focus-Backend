@@ -199,18 +199,29 @@ class AssignActivityView(APIView):
     permission_classes = [IsAdminAreaOrAbove]
 
     def post(self, request, pk):
-        activity = get_object_or_404(Activity, pk=pk)
-        user = request.user
+        from rest_framework.exceptions import NotFound, PermissionDenied
 
-        # admin_area limited to own area
-        if user.role == 'admin_area' and activity.area_id != user.area_id:
-            from rest_framework.exceptions import NotFound
+        # Reutilizar la misma función de acceso que detail/list para AA
+        try:
+            activity = _get_activity_for_user(pk, request.user)
+        except Activity.DoesNotExist:
             raise NotFound()
 
         serializer = AssignActivitySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         assignee = serializer.validated_data['assigned_to']
+        user = request.user
+
+        # Validar que el asignatario pertenezca al área del AA.
+        # SA puede asignar a cualquiera; AA solo a miembros de su área.
+        if assignee is not None and user.role == 'admin_area':
+            if assignee.area_id != user.area_id:
+                return Response(
+                    {'assigned_to': 'Solo puedes asignar actividades a miembros de tu área.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         activity.assigned_to = assignee
         activity.assigned_by = request.user
         activity._updated_by = request.user
