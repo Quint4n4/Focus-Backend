@@ -48,8 +48,9 @@ LOGGING['loggers']['productivity']['handlers'] = ['console']  # noqa: F405
 # ── Content Security Policy (django-csp) ──
 MIDDLEWARE = [  # noqa: F405
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',             # ← sirve /static/ sin Nginx
     'corsheaders.middleware.CorsMiddleware',
-    'csp.middleware.CSPMiddleware',                           # ← add CSP middleware
+    'csp.middleware.CSPMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -59,13 +60,17 @@ MIDDLEWARE = [  # noqa: F405
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# WhiteNoise: comprime y cachea archivos estáticos con hash en el nombre
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# CSP — Django admin requiere 'unsafe-inline' en scripts y estilos
 CSP_DEFAULT_SRC  = ("'none'",)
-CSP_SCRIPT_SRC   = ("'self'",)
-CSP_STYLE_SRC    = ("'self'",)
+CSP_SCRIPT_SRC   = ("'self'", "'unsafe-inline'")   # admin usa inline scripts
+CSP_STYLE_SRC    = ("'self'", "'unsafe-inline'")   # admin usa inline styles
 CSP_IMG_SRC      = ("'self'", 'data:')
 CSP_FONT_SRC     = ("'self'",)
 CSP_CONNECT_SRC  = ("'self'",)
 CSP_MEDIA_SRC    = ("'self'",)
 CSP_OBJECT_SRC   = ("'none'",)
 CSP_FRAME_SRC    = ("'none'",)
-CSP_REPORT_URI   = None  # configure if you have a CSP reporting endpoint
+CSP_REPORT_URI   = None

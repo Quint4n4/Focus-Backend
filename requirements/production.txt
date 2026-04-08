@@ -1,3 +1,4 @@
 -r base.txt
 django-csp>=3.8
 sentry-sdk>=1.40
+whitenoise[brotli]>=6.6

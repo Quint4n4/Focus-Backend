@@ -7,6 +7,9 @@ else
     echo "!!! WARN: migrate falló — arrancando gunicorn de todas formas para que /health/ sea accesible."
 fi
 
+echo "==> Recopilando archivos estáticos..."
+python manage.py collectstatic --no-input || echo "!!! WARN: collectstatic falló."
+
 echo "==> Creando superadmin si no existe..."
 python manage.py shell -c "
 from apps.authentication.models import User
