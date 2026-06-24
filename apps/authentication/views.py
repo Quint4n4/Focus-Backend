@@ -7,6 +7,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from .tokens import FocusRefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
@@ -41,7 +43,7 @@ class LoginView(APIView):
             )
 
         user = serializer.validated_data['user']
-        refresh = RefreshToken.for_user(user)
+        refresh = FocusRefreshToken.for_user(user)
 
         return Response({
             'access':  str(refresh.access_token),
@@ -205,7 +207,7 @@ class BiometricLoginView(APIView):
         except Exception:
             pass  # token_blacklist may not be enabled, proceed anyway
 
-        new_refresh = RefreshToken.for_user(user)
+        new_refresh = FocusRefreshToken.for_user(user)
         return Response({
             'access':  str(new_refresh.access_token),
             'refresh': str(new_refresh),

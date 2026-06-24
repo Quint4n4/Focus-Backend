@@ -13,6 +13,14 @@ class Invitation(models.Model):
         TRABAJADOR  = 'trabajador',  'Trabajador de Área'
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company    = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='invitations',
+        db_index=True,
+    )
     token_hash = models.CharField(max_length=64, unique=True)  # SHA-256 del token real
     code       = models.CharField(max_length=16, unique=True, null=True, blank=True)  # código corto legible
     area       = models.ForeignKey(

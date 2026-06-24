@@ -42,8 +42,9 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     """Serializer de solo lectura para los datos del usuario autenticado."""
 
-    area_id   = serializers.PrimaryKeyRelatedField(source='area', read_only=True)
-    area_name = serializers.SerializerMethodField()
+    area_id    = serializers.PrimaryKeyRelatedField(source='area', read_only=True)
+    area_name  = serializers.SerializerMethodField()
+    company_id = serializers.PrimaryKeyRelatedField(source='company', read_only=True)
 
     class Meta:
         model  = User
@@ -53,6 +54,7 @@ class UserSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'company_id',
             'area_id',
             'area_name',
             'biometrics_enabled',

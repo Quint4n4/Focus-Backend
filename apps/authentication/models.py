@@ -28,6 +28,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         choices=Role.choices,
         default=Role.TRABAJADOR,
     )
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='users',
+        db_index=True,
+    )
     area = models.ForeignKey(
         'areas.Area',
         on_delete=models.SET_NULL,

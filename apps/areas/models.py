@@ -6,6 +6,14 @@ from django.db import models
 
 class Area(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='areas',
+        db_index=True,
+    )
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
     created_by = models.ForeignKey(

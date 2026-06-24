@@ -10,21 +10,22 @@ fi
 echo "==> Recopilando archivos estáticos..."
 python manage.py collectstatic --no-input || echo "!!! WARN: collectstatic falló."
 
-echo "==> Creando superadmin si no existe..."
+echo "==> Creando admin de plataforma si no existe..."
 python manage.py shell -c "
 from apps.authentication.models import User
-if not User.objects.filter(email='admin@focus.com').exists():
+if not User.objects.filter(email='admin@focus.com', is_staff=True).exists():
     User.objects.create_superuser(
         email='admin@focus.com',
         password='Admin123!',
-        first_name='Super',
+        first_name='Platform',
         last_name='Admin',
         role='super_admin',
+        company=None,
     )
-    print('Superadmin creado.')
+    print('Admin de plataforma creado.')
 else:
-    print('Superadmin ya existe.')
-" || echo "!!! WARN: creación de superadmin falló (DB no disponible)."
+    print('Admin de plataforma ya existe.')
+" || echo "!!! WARN: creación de admin de plataforma falló (DB no disponible)."
 
 echo "==> Iniciando gunicorn..."
 exec gunicorn config.wsgi:application \

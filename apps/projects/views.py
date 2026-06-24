@@ -6,6 +6,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.mixins import TenantQuerySetMixin
 from core.permissions import IsAdminAreaOrAbove, IsWorkerOrAbove
 from .models import Project
 from .serializers import ProjectSerializer, ProjectCreateSerializer, ProjectProgressSerializer
@@ -13,60 +14,62 @@ from .serializers import ProjectSerializer, ProjectCreateSerializer, ProjectProg
 User = get_user_model()
 
 
-def _get_project_for_user(pk, user):
-    """Return Project if user has access, raise NotFound otherwise."""
-    project = get_object_or_404(Project.objects.select_related('created_by', 'area'), pk=pk)
+def _get_project_for_user(pk, user, company_id):
+    """Return Project if user has access within their company, raise NotFound otherwise."""
+    project = get_object_or_404(
+        Project.objects.select_related('created_by', 'area'),
+        pk=pk,
+        company_id=company_id,
+    )
     if user.role == 'super_admin':
         return project
-    # Proyecto personal (sin área) creado por este usuario
     if project.area_id is None and project.created_by_id == user.pk:
         return project
-    # Proyecto de equipo del área del usuario
     if project.area_id is not None and project.area_id == user.area_id:
         return project
     raise NotFound()
 
 
-class ProjectListCreateView(generics.ListCreateAPIView):
+class ProjectListCreateView(TenantQuerySetMixin, generics.ListCreateAPIView):
     """
     GET  /api/projects/  — list projects (IsWorkerOrAbove)
-    POST /api/projects/  — create project (IsAdminAreaOrAbove)
+    POST /api/projects/  — create project (IsWorkerOrAbove)
     """
-
-    def get_permissions(self):
-        # Todos los roles autenticados pueden crear proyectos personales
-        return [IsWorkerOrAbove()]
+    queryset           = Project.objects.all()
+    permission_classes = [IsWorkerOrAbove]
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return ProjectCreateSerializer
         return ProjectSerializer
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['company_id'] = self.get_company_id()
+        return ctx
+
     def get_queryset(self):
+        qs   = super().get_queryset().select_related('created_by', 'area')
         user = self.request.user
-        qs = Project.objects.select_related('created_by', 'area')
         if user.role == 'super_admin':
-            return qs.all()
+            return qs
         return qs.filter(
             Q(area_id=user.area_id) | Q(area_id__isnull=True, created_by=user)
         )
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, company=self.get_company())
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         area = serializer.validated_data.get('area')
 
-        # Trabajador / personal: solo pueden crear proyectos personales (sin área)
         if request.user.role in ('trabajador', 'personal') and area is not None:
             return Response(
                 {'area': 'Solo puedes crear proyectos personales (sin área).'},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        # Admin de área: solo puede crear en su propia área o proyectos personales
         if request.user.role == 'admin_area' and area is not None:
             if str(area.id) != str(request.user.area_id):
                 return Response(
@@ -88,28 +91,26 @@ class ProjectDetailView(APIView):
     """
     permission_classes = [IsWorkerOrAbove]
 
+    def _company_id(self):
+        return self.request.auth.payload.get('company_id') if self.request.auth else None
+
     def get(self, request, pk):
-        project = _get_project_for_user(pk, request.user)
-        serializer = ProjectSerializer(project, context={'request': request})
-        return Response(serializer.data)
+        project = _get_project_for_user(pk, request.user, self._company_id())
+        return Response(ProjectSerializer(project, context={'request': request}).data)
 
     def patch(self, request, pk):
-        project = _get_project_for_user(pk, request.user)
+        project = _get_project_for_user(pk, request.user, self._company_id())
         if request.user.role == 'trabajador':
             raise PermissionDenied()
         serializer = ProjectCreateSerializer(
-            project,
-            data=request.data,
-            partial=True,
-            context={'request': request},
+            project, data=request.data, partial=True, context={'request': request}
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        output = ProjectSerializer(serializer.instance, context={'request': request})
-        return Response(output.data)
+        return Response(ProjectSerializer(serializer.instance, context={'request': request}).data)
 
     def delete(self, request, pk):
-        project = _get_project_for_user(pk, request.user)
+        project = _get_project_for_user(pk, request.user, self._company_id())
         if request.user.role == 'trabajador':
             raise PermissionDenied()
         project.delete()
@@ -117,9 +118,7 @@ class ProjectDetailView(APIView):
 
 
 class ProjectActivitiesView(APIView):
-    """
-    GET /api/projects/<pk>/activities/  — paginated list of activities in project
-    """
+    """GET /api/projects/<pk>/activities/"""
     permission_classes = [IsWorkerOrAbove]
 
     def get(self, request, pk):
@@ -128,16 +127,12 @@ class ProjectActivitiesView(APIView):
         from apps.activities.serializers import ActivityListSerializer
         from rest_framework.pagination import PageNumberPagination
 
-        project = _get_project_for_user(pk, request.user)
-        user = request.user
+        company_id = request.auth.payload.get('company_id') if request.auth else None
+        project    = _get_project_for_user(pk, request.user, company_id)
+        user       = request.user
 
         qs = project.activities.order_by('-created_at')
-
-        # SA y AA ven todas las actividades del proyecto.
-        # _get_project_for_user ya garantizó que el AA pertenece al área del proyecto,
-        # así que no filtramos por area_id aquí (actividades pueden tenerlo null).
         if user.role not in ('super_admin', 'admin_area'):
-            # trabajador/personal: solo las propias o asignadas
             qs = qs.filter(DQ(owner=user) | DQ(assigned_to=user))
 
         paginator = PageNumberPagination()
@@ -148,24 +143,22 @@ class ProjectActivitiesView(APIView):
 
 
 class ProjectProgressView(APIView):
-    """
-    GET /api/projects/<pk>/progress/  — aggregated progress stats
-    """
+    """GET /api/projects/<pk>/progress/"""
     permission_classes = [IsWorkerOrAbove]
 
     def get(self, request, pk):
-        project = _get_project_for_user(pk, request.user)
-        qs = project.activities.all()
-        total = qs.count()
-        completed = qs.filter(status='completed').count()
-        pending = qs.filter(status='pending').count()
+        company_id = request.auth.payload.get('company_id') if request.auth else None
+        project    = _get_project_for_user(pk, request.user, company_id)
+        qs         = project.activities.all()
+        total      = qs.count()
+        completed  = qs.filter(status='completed').count()
+        pending    = qs.filter(status='pending').count()
         in_progress = qs.exclude(status__in=['completed', 'inbox']).count()
-        completion_percentage = round(completed / total * 100, 1) if total > 0 else 0.0
         data = {
             'total': total,
             'completed': completed,
             'pending': pending,
             'in_progress': in_progress,
-            'completion_percentage': completion_percentage,
+            'completion_percentage': round(completed / total * 100, 1) if total > 0 else 0.0,
         }
         return Response(ProjectProgressSerializer(data).data)

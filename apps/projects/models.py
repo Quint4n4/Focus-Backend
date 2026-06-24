@@ -9,8 +9,16 @@ class Project(models.Model):
         ACTIVE   = 'active',   'Activo'
         ARCHIVED = 'archived', 'Archivado'
 
-    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name        = models.CharField(max_length=255)
+    id      = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='projects',
+        db_index=True,
+    )
+    name    = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     area        = models.ForeignKey(
         'areas.Area',

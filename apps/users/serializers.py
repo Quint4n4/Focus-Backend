@@ -46,7 +46,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
 class InvitationCreateSerializer(serializers.Serializer):
     area = serializers.PrimaryKeyRelatedField(
-        queryset=Area.objects.all(),
+        queryset=Area.objects.none(),  # se reemplaza en __init__
         required=False,
         allow_null=True,
     )
@@ -54,6 +54,14 @@ class InvitationCreateSerializer(serializers.Serializer):
         choices=Invitation.Role.choices,
         default=Invitation.Role.TRABAJADOR,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        company_id = self.context.get('company_id')
+        if company_id:
+            self.fields['area'].queryset = Area.objects.filter(company_id=company_id)
+        else:
+            self.fields['area'].queryset = Area.objects.all()
 
     def validate(self, attrs):
         role = attrs.get('role')
@@ -68,7 +76,7 @@ class InvitationCreateSerializer(serializers.Serializer):
             )
         return attrs
 
-    def save(self, created_by):
+    def save(self, created_by, company=None):
         area       = self.validated_data.get('area')
         role       = self.validated_data['role']
         raw_token, token_hash = Invitation.generate_token()
@@ -80,6 +88,7 @@ class InvitationCreateSerializer(serializers.Serializer):
             code=code,
             area=area,
             role=role,
+            company=company,
             created_by=created_by,
             expires_at=expires_at,
         )
@@ -172,6 +181,7 @@ class AcceptInvitationSerializer(serializers.Serializer):
             last_name=last_name,
             role=invitation.role,
             area=invitation.area,
+            company=invitation.company,
         )
 
         invitation.used = True

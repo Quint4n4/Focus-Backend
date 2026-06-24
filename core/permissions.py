@@ -3,6 +3,26 @@ from rest_framework.permissions import BasePermission, IsAuthenticated
 VALID_ROLES = {'super_admin', 'admin_area', 'trabajador', 'personal'}
 
 
+class IsSameTenant(BasePermission):
+    """
+    Verifica que el company_id del token coincida con el de request.user.
+    Protección de segunda capa: cubre bugs en querysets y tokens reutilizados
+    entre empresas. Los usuarios de plataforma (is_staff=True) pasan siempre.
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.user.is_staff:
+            return True
+        if not hasattr(request, 'auth') or request.auth is None:
+            return False
+        token_company_id = request.auth.payload.get('company_id')
+        if not token_company_id:
+            return False
+        return str(request.user.company_id) == token_company_id
+
+
 class IsSuperAdmin(BasePermission):
     """Solo el Super Admin puede acceder."""
 

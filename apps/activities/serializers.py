@@ -26,15 +26,16 @@ class _UserTinySerializer(serializers.Serializer):
 
 
 class ActivitySerializer(serializers.ModelSerializer):
-    owner = _UserMiniSerializer(read_only=True)
+    owner       = _UserMiniSerializer(read_only=True)
+    assigned_by = _UserMiniSerializer(read_only=True)
+
     assigned_to = serializers.PrimaryKeyRelatedField(
         allow_null=True,
         required=False,
-        queryset=User.objects.all(),
+        queryset=User.objects.none(),  # se reemplaza en __init__
     )
-    assigned_by = _UserMiniSerializer(read_only=True)
     area = serializers.PrimaryKeyRelatedField(
-        queryset=Area.objects.all(),
+        queryset=Area.objects.none(),  # se reemplaza en __init__
         required=False,
         allow_null=True,
     )
@@ -42,11 +43,26 @@ class ActivitySerializer(serializers.ModelSerializer):
         serializers.PrimaryKeyRelatedField(
             allow_null=True,
             required=False,
-            queryset=_Project.objects.all(),
+            queryset=_Project.objects.none() if _HAS_PROJECT else None,
         )
         if _HAS_PROJECT
         else serializers.UUIDField(allow_null=True, required=False)
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        company_id = self.context.get('company_id')
+        if company_id:
+            self.fields['assigned_to'].queryset = User.objects.filter(company_id=company_id)
+            self.fields['area'].queryset         = Area.objects.filter(company_id=company_id)
+            if _HAS_PROJECT:
+                self.fields['project'].queryset  = _Project.objects.filter(company_id=company_id)
+        else:
+            # Sin contexto (e.g. admin panel), usar todos — la validación del token previene abuso
+            self.fields['assigned_to'].queryset = User.objects.all()
+            self.fields['area'].queryset         = Area.objects.all()
+            if _HAS_PROJECT:
+                self.fields['project'].queryset  = _Project.objects.all()
 
     def to_internal_value(self, data):
         # Normalizar area_id → area y project_id → project por si el cliente
@@ -104,9 +120,17 @@ class MoveActivitySerializer(serializers.Serializer):
 
 class AssignActivitySerializer(serializers.Serializer):
     assigned_to = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
+        queryset=User.objects.none(),
         allow_null=True,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        company_id = self.context.get('company_id')
+        if company_id:
+            self.fields['assigned_to'].queryset = User.objects.filter(company_id=company_id)
+        else:
+            self.fields['assigned_to'].queryset = User.objects.all()
 
 
 class ActivityLogSerializer(serializers.ModelSerializer):

@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'axes',
     'django_extensions',
     # Apps del proyecto
+    'apps.companies',
     'apps.authentication',
     'apps.users',
     'apps.areas',
@@ -113,6 +114,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        'core.permissions.IsSameTenant',
     ),
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardResultsSetPagination',
     'PAGE_SIZE': 20,

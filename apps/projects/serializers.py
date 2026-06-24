@@ -54,10 +54,18 @@ class ProjectSerializer(serializers.ModelSerializer):
 class ProjectCreateSerializer(serializers.ModelSerializer):
     """Write serializer for creating/updating projects."""
     area = serializers.PrimaryKeyRelatedField(
-        queryset=Area.objects.all(),
+        queryset=Area.objects.none(),  # se reemplaza en __init__
         required=False,
         allow_null=True,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        company_id = self.context.get('company_id')
+        if company_id:
+            self.fields['area'].queryset = Area.objects.filter(company_id=company_id)
+        else:
+            self.fields['area'].queryset = Area.objects.all()
 
     class Meta:
         model = Project

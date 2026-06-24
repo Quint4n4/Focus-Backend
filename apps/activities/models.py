@@ -13,8 +13,16 @@ class Activity(models.Model):
         PENDING   = 'pending',    'Pendiente'
         COMPLETED = 'completed',  'Completada'
 
-    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title       = models.CharField(max_length=255)
+    id      = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='activities',
+        db_index=True,
+    )
+    title   = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     status      = models.CharField(max_length=20, choices=Status.choices, default=Status.INBOX)
 
