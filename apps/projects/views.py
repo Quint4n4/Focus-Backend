@@ -103,7 +103,8 @@ class ProjectDetailView(APIView):
         if request.user.role == 'trabajador':
             raise PermissionDenied()
         serializer = ProjectCreateSerializer(
-            project, data=request.data, partial=True, context={'request': request}
+            project, data=request.data, partial=True,
+            context={'request': request, 'company_id': self._company_id()},
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()

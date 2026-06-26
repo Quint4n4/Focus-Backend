@@ -91,7 +91,8 @@ def health_check(request):
         info['db_status'] = 'error'
         info['db_error'] = str(e)
         info['status'] = 'degraded'
-    return JsonResponse(info)
+    http_status = 200 if info.get('db_status') == 'ok' else 503
+    return JsonResponse(info, status=http_status)
 
 
 urlpatterns = [

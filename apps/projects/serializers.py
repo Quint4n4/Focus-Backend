@@ -42,9 +42,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_area_admin_name(self, obj):
         if not obj.area_id:
             return None
-        # Usa area_id directo (sin cargar area FK de nuevo)
         admin = User.objects.filter(
-            area_id=obj.area_id, role='admin_area'
+            area_id=obj.area_id, role='admin_area', company_id=obj.company_id,
         ).values('first_name', 'last_name').first()
         if admin:
             return f"{admin['first_name']} {admin['last_name']}".strip() or None
